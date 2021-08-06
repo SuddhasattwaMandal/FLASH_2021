@@ -1,0 +1,6 @@
+# dependencies
+  - numpy
+  - matplotlib
+  - scipy
+  - h5py
+  - pyyaml

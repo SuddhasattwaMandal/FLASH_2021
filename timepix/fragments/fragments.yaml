@@ -1,0 +1,118 @@
+fragments:
+    test_ion:
+        tof_start: 1.0575E-5 
+        tof_end: 1.0775E-5
+        center_x: 134
+        center_y: 186
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255
+    test_ion2:
+        tof_start: 7.65E-6 
+        tof_end: 7.99E-6
+        center_x: 132
+        center_y: 169
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255
+    I+:
+        tof_start: 7.7E-6 
+        tof_end: 8.0E-6
+        center_x: 136
+        center_y: 172
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    I2+:
+        tof_start: 5.6E-6 
+        tof_end: 6.0E-6
+        center_x: 136
+        center_y: 161
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    I3+:
+        tof_start: 4.90E-6 
+        tof_end:  4.95E-6
+        center_x: 136
+        center_y: 160
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    I4+:
+        tof_start: 4.37E-6 
+        tof_end: 4.40E-6
+        center_x: 136
+        center_y: 160
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    I5+:
+        tof_start: 5.2E-6 
+        tof_end: 5.4E-6
+        center_x: 1
+        center_y: 1
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    I6+:
+        tof_start: 3.74E-6 
+        tof_end: 3.79E-6
+        center_x: 136
+        center_y: 156
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    parent+:
+        tof_start: 5.6E-6 
+        tof_end: 6.0E-6
+        center_x: 1
+        center_y: 1
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    parent-I+:
+        tof_start: 6.27E-6 
+        tof_end: 6.42E-6
+        center_x: 134
+        center_y: 164
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    C+:
+        tof_start: 5.6E-6 
+        tof_end: 6.0E-6
+        center_x: 1
+        center_y: 1
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    N+:
+        tof_start: 3.17E-6 
+        tof_end: 3.31E-6
+        center_x: 134
+        center_y: 144
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255 
+    H+:
+        tof_start: 1.5E-6 
+        tof_end: 1.61E-6
+        center_x: 134
+        center_y: 131
+        start_x: 0
+        end_x: 255
+        start_y: 0
+        end_y: 255
