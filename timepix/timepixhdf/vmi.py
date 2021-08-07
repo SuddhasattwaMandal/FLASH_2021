@@ -2,6 +2,7 @@ import numpy as np
 from timepixhdf.utils import reproject_image_into_polar
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from scipy import ndimage
 
 
 class VmiImage():
@@ -15,11 +16,92 @@ class VmiImage():
         self.xlabel = 'x [px]'
         self.ylabel = 'y [px]'
         self.image = self.__create_image()
+        self.process = self.__process_image()
+        self.invert = self.__do_meveler()
 
     def __create_image(self):
         ''' Transpose array results in x = 1st y = 2nd dimension '''
         counts, xbins, ybins = np.histogram2d(self.x, self.y, bins=(self.bins, self.bins))
         return np.transpose(counts)
+
+    def __process_image(self, center=[128, 128], angle=5, crop=False, radius=bin_space,
+            rect=False, table_path=None) :
+        import subprocess
+
+        image_in = self.image
+        cx, cy = center
+        image_translated = np.zeros(image_in.shape)
+        nrow, ncol = image_in.shape
+        for irow, row in enumerate(image_in):
+            for icol, num in enumerate(row):
+                ir = irow + round(nrow / 2) - cy
+                ic = icol + round(ncol / 2) - cx
+                if (ir >= 0 and ir < nrow) and (ic >= 0 and ic < ncol):
+                    image_translated[ir, ic] = num
+
+        image_rotated = ndimage.rotate(image_translated, angle)
+
+        if crop:
+            mask = np.zeros(image_rotated.shape)
+            nrow, ncol = image_rotated.shape
+            crow = round(nrow / 2)
+            ccol = round(ncol / 2)
+            for irow, row in enumerate(mask):
+                for icol, num in enumerate(row):
+                    iradius = ((irow - crow) ** 2 + (icol - ccol) ** 2) ** 0.5
+                    if iradius <= radius:
+                        mask[irow, icol] = 1
+            image_out = mask * image_rotated
+        else:
+            image_out = image_rotated
+
+        np.savetxt(f'Proc_vmi_image.dat', image_out, delimiter='\t')
+
+        if rect:
+            max_val = str(math.floor(np.amax(image_out)))
+            command = f'wine polar Proc_vmi_image -t {table_path} -r 170 0.5 0.5 -I 0 {max_val} !'
+            subprocess.run(command, shell=True)
+            image_out = np.loadtxt(f'Proc_vmi_image_rect.dat', delimiter='\t')
+
+        return image_out
+
+    def __do_meveler(self):
+        import subprocess
+
+        np.savetxt('vmi_image_proc', self.process, delimiter='\t')
+
+        nrow, ncol = self.image.shape
+        ix = round(ncol/2)
+        iz = round(nrow/2)
+        command = f'/home/keshav/phd/beamline/FLASH_2021/timepix/programs/F2QC vmi_image -IX{ix} -IZ{iz} -M0'
+        subprocess.run(command, shell=True)
+
+        command = '/home/keshav/phd/beamline/FLASH_2021/timepix/programs/Meveler2 DefaultQ.dat'
+        subprocess.run(command, shell=True)
+
+        im1 = np.loadtxt('MEXmap.dat', delimiter=',')
+        im2 = np.fliplr(im1)
+        im3 = np.flipud(im2)
+        im4 = np.fliplr(im3)
+        mev1 = np.append(im4, im1, axis=0)
+        mev2 = np.append(im3, im2, axis=0)
+        mev_image = np.append(mev2, mev1, axis=1)
+
+        with open('MEXdis.dat', 'r') as f:
+            data = []
+            for line in f:
+                line = line.replace('D', 'E')
+                data.append(line.split())
+        mexdis = np.array(data, dtype=float)
+
+        subprocess.run('rm DefaultQ.dat', shell=True)
+        subprocess.run('rm MEXini.dat', shell=True)
+        subprocess.run('rm MEXdis.dat', shell=True)
+        subprocess.run('rm MEXmap.dat', shell=True)
+        subprocess.run('rm MEXres.dat', shell=True)
+        subprocess.run('rm MEXsim.dat', shell=True)
+
+        return mev_image
 
     def __add_labels(self):
         plt.title(self.title)
@@ -29,6 +111,15 @@ class VmiImage():
     def show(self):
         plt.imshow(self.image, origin='lower')
         self.__add_labels()
+        plt.colorbar()
+        plt.show()
+
+    def show_mev(self):
+        plt.imshow(self.invert)
+        plt.title("Invert Image")
+        plt.xlabel(self.xlabel)
+        plt.ylabel(self.ylabel)
+        plt.colorbar()
         plt.show()
 
     def zoom_in(self, x_start, x_end, y_start, y_end):
@@ -104,3 +195,4 @@ class VmiImage():
         self.plot_profileline(radial_average)
         plt.show()
         return radial_average
+
