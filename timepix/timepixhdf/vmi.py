@@ -8,30 +8,43 @@ from scipy import ndimage
 class VmiImage():
     bin_space = 256  # number of pixel
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, center=[128, 128], angle=0, crop=False,
+            radius=bin_space, rect=False, table_path=None):
+
+    # User Input
         self.x = x
         self.y = y
+        self.center = center
+        self.angle = angle
+        self.crop = False
+        self.radius = radius
+        self.rect = rect
+        self.table_path = table_path
+        
         self.bins = np.linspace(0, self.bin_space, self.bin_space + 1)
         self.title = 'VMI image'
         self.xlabel = 'x [px]'
         self.ylabel = 'y [px]'
         self.image = self.__create_image()
         self.process = self.__process_image()
-        self.invert = self.__do_meveler()
+        self.invert, self.mexdis = self.__do_meveler()
 
     def __create_image(self):
         ''' Transpose array results in x = 1st y = 2nd dimension '''
         counts, xbins, ybins = np.histogram2d(self.x, self.y, bins=(self.bins, self.bins))
-        return np.transpose(counts)
+        vmi_image = np.transpose(counts)
+        np.savetxt(f'./Images/vmi_image.dat', vmi_image, delimiter="\t")
+        return vmi_image
 
-    def __process_image(self, center=[128, 128], angle=5, crop=False, radius=bin_space,
-            rect=False, table_path=None) :
+    def __process_image(self) :
         import subprocess
 
         image_in = self.image
-        cx, cy = center
+        cx, cy = self.center
+
         image_translated = np.zeros(image_in.shape)
         nrow, ncol = image_in.shape
+
         for irow, row in enumerate(image_in):
             for icol, num in enumerate(row):
                 ir = irow + round(nrow / 2) - cy
@@ -39,9 +52,9 @@ class VmiImage():
                 if (ir >= 0 and ir < nrow) and (ic >= 0 and ic < ncol):
                     image_translated[ir, ic] = num
 
-        image_rotated = ndimage.rotate(image_translated, angle)
+        image_rotated = ndimage.rotate(image_translated, self.angle)
 
-        if crop:
+        if self.crop:
             mask = np.zeros(image_rotated.shape)
             nrow, ncol = image_rotated.shape
             crow = round(nrow / 2)
@@ -49,34 +62,37 @@ class VmiImage():
             for irow, row in enumerate(mask):
                 for icol, num in enumerate(row):
                     iradius = ((irow - crow) ** 2 + (icol - ccol) ** 2) ** 0.5
-                    if iradius <= radius:
+                    if iradius <= self.radius:
                         mask[irow, icol] = 1
             image_out = mask * image_rotated
         else:
             image_out = image_rotated
 
-        np.savetxt(f'Proc_vmi_image.dat', image_out, delimiter='\t')
+        np.savetxt(f'./Images/Proc_vmi_image.dat', image_out, delimiter='\t')
 
-        if rect:
+        if self.rect:
             max_val = str(math.floor(np.amax(image_out)))
-            command = f'wine polar Proc_vmi_image -t {table_path} -r 170 0.5 0.5 -I 0 {max_val} !'
+            command = f'wine ./programs/polar Proc_vmi_image -t {self.table_path} -r 170 0.5 0.5 -I 0 {max_val} !'
             subprocess.run(command, shell=True)
-            image_out = np.loadtxt(f'Proc_vmi_image_rect.dat', delimiter='\t')
+            image_out = np.loadtxt(f'./Images/Proc_vmi_image_rect.dat', delimiter='\t')
+            subprocess.run('rm ./Images/Proc_vmi_image_rect.dat', shell=True)
+
+        subprocess.run('rm ./Images/Proc_vmi_image.dat', shell=True)
 
         return image_out
 
     def __do_meveler(self):
         import subprocess
 
-        np.savetxt('vmi_image_proc', self.process, delimiter='\t')
+        np.savetxt('./Images/vmi_image_proc', self.process, delimiter='\t')
 
         nrow, ncol = self.image.shape
         ix = round(ncol/2)
         iz = round(nrow/2)
-        command = f'/home/keshav/phd/beamline/FLASH_2021/timepix/programs/F2QC vmi_image -IX{ix} -IZ{iz} -M0'
+        command = f'./programs/F2QC ./Images/vmi_image_proc -IX{ix} -IZ{iz} -M0'
         subprocess.run(command, shell=True)
 
-        command = '/home/keshav/phd/beamline/FLASH_2021/timepix/programs/Meveler2 DefaultQ.dat'
+        command = './programs/Meveler2 DefaultQ.dat'
         subprocess.run(command, shell=True)
 
         im1 = np.loadtxt('MEXmap.dat', delimiter=',')
@@ -101,7 +117,10 @@ class VmiImage():
         subprocess.run('rm MEXres.dat', shell=True)
         subprocess.run('rm MEXsim.dat', shell=True)
 
-        return mev_image
+        np.savetxt('./Images/mev_image.dat', mev_image, delimiter='\t')
+        np.savetxt('./Images/mexdis.dat', mexdis, delimiter='\t')
+
+        return mev_image, mexdis
 
     def __add_labels(self):
         plt.title(self.title)
