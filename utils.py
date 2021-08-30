@@ -2,6 +2,8 @@
 import numpy as np
 from pathlib import Path
 import h5py
+from logging import warning
+from datetime import datetime
 
 # variables which will be used often
 PNCCD_DATA_PATH = Path("./data/pnCCD sample files/")
@@ -23,6 +25,8 @@ SAVED_FILES = set()
 # threshold for hitfinding
 THRESHOLD = 12000
 
+
+######### H5 FILEHANDLING ###########
 
 def select_h5_files(PNCCD_DATA_PATH):
     nameSet = []
@@ -46,13 +50,18 @@ def data_from_key(h5_fp: Path, key: str) -> np.array:
             return np.asarray(data[PNCCD_KEY][key])
 
 
-def load_pnccd_image_data(h5_fp: Path):
+def load_pnccd_image_data(h5_fp: Path, threshold = 0):
     """
     loads newest .h5 file in directory containing PNCCD_KEY and IMAGE_KEY-
     return 2 dimensional numpy array representing the image
     if more than one image was taken, mean of image is returned.
     """
-    pnccd_image = data_from_key(h5_fp, IMAGE_KEY)
+    if threshold != 0:
+        images = data_from_key(h5_fp, IMAGE_KEY)
+        return [np.asarray((array > threshold) * array) for array in images]
+    else:
+        return data_from_key(h5_fp, IMAGE_KEY)
+
     return pnccd_image
 
 
@@ -70,6 +79,75 @@ def load_timestamp(h5_fp):
 
 def load_datasetID(h5_fp):
     return data_from_key(h5_fp, DATASETID_KEY)
+
+
+def select_recent_h5_file(PNCCD_DATA_PATH: Path):
+    """
+    check for most recent .h5 file in the PNCCD_DATA_PATH
+    containing PNCCD_KEY and IMAGE_KEY in the file name. return filepath of most recent file.
+    Breaks down if files are removed from the directory while running.
+    """
+    global SAVED_FILES
+
+    nameSet = set()
+    for file in PNCCD_DATA_PATH.iterdir():
+        # read new files containing the KEYWORDS and add to set
+        if H5_TYPE and PNCCD_KEY.lower() in str(file):
+            if file.is_file():
+                nameSet.add(file)
+
+    RETRIEVED_FILES = set()
+
+    for name in nameSet:
+        stat = name.stat()
+        time = stat.st_ctime
+        size = stat.st_size
+        # Also consider using ST_MTIME to detect last time modified
+        # Note that the time is saved at second positions
+        # for comparision in next step
+        RETRIEVED_FILES.add((name, time, size))
+
+    NEW_FILES = RETRIEVED_FILES - SAVED_FILES
+
+    # sort for most recent file and return file_üath
+    if NEW_FILES:
+        if len(NEW_FILES) != 1:
+            warning("more than one new file in directory")
+
+        s = sorted(NEW_FILES, key=lambda file: file[1])
+        file_path, time, size = s[-1]
+        # reset variables
+        NEW_FILES = set()
+        SAVED_FILES = SAVED_FILES.union(RETRIEVED_FILES)
+        return file_path, datetime.fromtimestamp(time), size
+    else:
+        SAVED_FILES = RETRIEVED_FILES
+        s = sorted(SAVED_FILES, key=lambda file: file[1])
+        file_path, time, size = s[-1]
+        return file_path, datetime.fromtimestamp(time), size
+
+
+def integrated_intensity(h5_fp, threshold=0):
+    img_ids = [ID for ID in load_trainID(h5_fp)]
+    index = np.arange(0, len(img_ids), 1)
+    intgr_intensities = [sum_array(image, threshold) for image in load_pnccd_image_data(h5_fp)]
+    return img_ids, intgr_intensities, index
+
+
+def N_brightest_images(h5_fp, N: int, threshold: int):
+    img_ids, intensities, index = integrated_intensity(h5_fp, threshold=threshold)
+    unsorted = [(intensity, i, id) for intensity, i, id in zip(intensities, index, img_ids)]
+    s = sorted(unsorted, key=lambda item: item[0])
+    s = s[len(s)-N:len(s)]
+    intensity, index, train_id = [entry[0] for entry in s], [entry[1] for entry in s], [entry[2] for entry in s]
+    images = load_pnccd_image_data(h5_fp, threshold)
+    brightest_images = [images[i] for i in index]
+    return brightest_images, intensity, index, train_id
+
+
+######## ARRAY CALCULATIONS ###########
+def sum_array(image: np.ndarray, threshold: int):
+    return np.sum(np.array(image) >= threshold)
 
 
 def basic_hitfinding(image: np.ndarray, threshold: int = 15000):

@@ -6,7 +6,7 @@ import numpy as np
 from utils import select_h5_files
 import pandas as pd
 from utils import data_from_key, TRAINID_KEY, basic_hitfinding, IMAGE_KEY
-from animation import run_animation
+from live_window import live_window
 import cv2
 
 CWD = Path(os.getcwd())
@@ -85,29 +85,27 @@ def main_window():
     file_list_column = [[
         sg.Text("Data Folder"),
         sg.In(size=(25, 1), enable_events=True, key="-FOLDER-"),
-        sg.FolderBrowse(),
+        sg.FolderBrowse(),        sg.Button("Refresh", key="-REFRESH-"),
     ],
         [sg.Text(f"Current data directory : {DATA_PATH}", key="-DATA_DIR-")],
         [
             sg.Listbox(
                 values=[], enable_events=True, size=(40, 20), key="-FILE_LIST-"
             )
-        ]]
-    button_column = [[sg.Text("No File selected!", key="-FILE_SELECTED-")],
+        ],
+
+    ]
+    button_column = [
+                     [sg.Button("LIVE VIEW", key="-LIVE_VIEW-")],
                      [sg.HorizontalSeparator(color="white")],
-                     [sg.Button("Refresh files", key="-REFRESH-")],
-                     [sg.Button("Display pnCCD images", key="-DISPLAY-")],
-                     [sg.Button("Data statistics", key="-DATA-STATS-")],
-                     [sg.Text("Set Threshold for hitfinding : ")],
-                     [sg.Slider(range=(1, 40000), orientation='h', size=(20, 10), default_value=10000,
-                                key="-THRESHOLD_SLIDER-", enable_events=True)],
+                     [sg.Button("SINGLE VIEW", key="-SINGLE_VIEW-")],
+                     [sg.Text("No File selected!", key="-FILE_SELECTED-")],
                      [sg.HorizontalSeparator(color="white")],
-                     [sg.Text("Save path : "), sg.Text(SAVE_PATH, key="-SAVE_PATH-")],
-                     [sg.Button("Set", key="-SET_SAVEPATH-")],
-                     [sg.Text("Save images by entering \nDataset ID or Train ID:"), sg.Input(key="-SAVE_ID_IN-"),
-                      sg.Input()],
-                     [sg.Button("Confirm", key="-SAVE_IMAGE-")]
+                     [sg.Button("STATISTICS TABLE", key="-TABLE-")],
+                     [sg.HorizontalSeparator(color="white")],
+                     [sg.Text("Save path : "), sg.Text(SAVE_PATH, key="-SAVE_PATH-"), sg.Button("Set", key="-SET_SAVEPATH-")],
                      ]
+
     # ----- Full layout -----
     layout = [
         [sg.Column(file_list_column), sg.Column(button_column)],
@@ -116,16 +114,16 @@ def main_window():
 
 
 main_win, animation_win, table_win = main_window(), None, None
+
 while True:
+    # POSSIBLE EVENT KEYS: -LIVE_VIEW-, -SINGLE_VIEW-, -TABLE- , -SET_SAVEPATH-, -REFRESH-, -FOLDER-, -FILE_LIST-
     window, event, values = sg.read_all_windows()
-    #print(window, event, values)
+
+    print(window, event, values)
     if window == main_win and event in (sg.WIN_CLOSED, 'Exit'):
         break
-    if window == table_win:
-        if event == "-EXIT_TABLE-":
-            table_win.close()
-    if event == "-THRESHOLD_SLIDER-":
-        THRESHOLD = values["-THRESHOLD_SLIDER-"]
+
+    ########## FILE SELECTION ##########
     if event == "-FOLDER-":
         folder = values["-FOLDER-"]
         fnames, parent = select_h5_files(DATA_PATH)
@@ -135,37 +133,26 @@ while True:
         fnames, parent = select_h5_files(DATA_PATH)
         window["-FILE_LIST-"].update(fnames)
         window["-DATA_DIR-"].update(parent)
-    elif event == "-DISPLAY-" and SELECTED_FILE:
-        THRESHOLD = values["-THRESHOLD_SLIDER-"]
-        run_animation(SELECTED_FILE, THRESHOLD)
     elif event == "-FILE_LIST-":
         NEW_FILE = Path(parent) / values["-FILE_LIST-"][0]
         if NEW_FILE != SELECTED_FILE:
             SELECTED_FILE = NEW_FILE
             print("Selected new file : ", SELECTED_FILE)
             window["-FILE_SELECTED-"].update(value=SELECTED_FILE.name)
-    elif event == "-DATA-STATS-":
-        if SELECTED_FILE and not SHOWING_TABLE:
-            table_win = table(SELECTED_FILE)
-            SHOWING_TABLE = True
-        elif SHOWING_TABLE:
-            table_win.close()
-            print("Closing old table")
-            table_win = table(SELECTED_FILE)
+    ########## SET SAVEPATH ##########
     elif event == "-SET_SAVEPATH-":
         save_folder = sg.popup_get_folder("Select folder for saving",
                                           title="Select save folder", default_path=CWD)
         SAVE_PATH = Path(save_folder)
         window["-SAVE_PATH-"].update(".../" + SAVE_PATH.name)
-    elif event == "-SAVE_IMAGE-":
-        train_id = int(values["-SAVE_ID_IN-"])
-        if not SAVE_PATH or not SAVE_PATH.is_dir():
-            sg.popup_error("No save folder selected!")
-        else:
-            success = save(train_id)
-            if success:
-                print("Saving was successful.")
-            else:
-                print("Saving was not successful.")
+    ########## LIVE VIEW ##########
+    elif event == "-LIVE_VIEW-":
+        live_window()
+
+
+    ########## SINGLE VIEW ##########
+
+
+    ########## STATISTICS ##########
 
 window.close()
