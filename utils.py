@@ -2,6 +2,8 @@
 import numpy as np
 from pathlib import Path
 import h5py
+import json
+import pandas as pd
 from logging import warning
 from datetime import datetime
 
@@ -25,20 +27,63 @@ SAVED_FILES = set()
 # threshold for hitfinding
 THRESHOLD = 12000
 
+######### H5 to Dataframe #########
+
+
+def df_from_h5(h5_fp, threshold=0):
+    columns = ["Train ID", "Intgr. Intensity", f"Hits (t: {threshold}", "Mean Px Value", "Dataset ID", "Timestamp",  "Temperature"]
+    data = list([])
+
+    images = load_pnccd_image_data(h5_fp)
+    data.append(load_trainID(h5_fp))
+    _, intensities, _ = integrated_intensity(h5_fp, 0)
+    data.append(intensities)
+    data.append([basic_hitfinding(img, threshold) for img in images])
+    data.append([np.mean(img.flatten()) for img in images])
+    id = load_datasetID(h5_fp)
+    data.append([str(id) for _ in range(0, len(images))])
+    data.append([datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S') for time in load_timestamp(h5_fp)])
+    data.append(load_temperature(h5_fp))
+    df = pd.DataFrame(data=data).transpose()
+    df.columns = columns
+    return df
+
+
+def save_df_as_json(df: pd.DataFrame, save_path):
+    if save_path:
+        f = save_path / f"table_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.json"
+        result = df.to_json(f, orient="table")
+        return True
+    else:
+        warning("no save path has been specified yet")
+        return False
+
+
+def df_from_path(file_path):
+    if file_path:
+        data = json.load(open(file_path))
+        df = pd.DataFrame(data["data"])
+        return df
+    return None
+
 
 ######### H5 FILEHANDLING ###########
 
 def select_h5_files(PNCCD_DATA_PATH):
     nameSet = []
+    times = []
     if isinstance(PNCCD_DATA_PATH, str):
         PNCCD_DATA_PATH = Path(PNCCD_DATA_PATH)
     for file in PNCCD_DATA_PATH.rglob("*"):
         # read new files containing the KEYWORDS and add to set
         if H5_TYPE and PNCCD_KEY.lower() in str(file.name):
             if file.is_file():
+                stat = file.stat()
+                time = stat.st_ctime
                 nameSet.append(str(file.name))
+                times.append(datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S'))
                 parent = str(file.parent)
-    return nameSet, parent
+    return nameSet, parent, times
 
 
 def data_from_key(h5_fp: Path, key: str) -> np.array:
@@ -61,8 +106,6 @@ def load_pnccd_image_data(h5_fp: Path, threshold = 0):
         return [np.asarray((array > threshold) * array) for array in images]
     else:
         return data_from_key(h5_fp, IMAGE_KEY)
-
-    return pnccd_image
 
 
 def load_temperature(h5_fp):
@@ -109,7 +152,7 @@ def select_recent_h5_file(PNCCD_DATA_PATH: Path):
 
     NEW_FILES = RETRIEVED_FILES - SAVED_FILES
 
-    # sort for most recent file and return file_üath
+    # sort for most recent file and return file_path
     if NEW_FILES:
         if len(NEW_FILES) != 1:
             warning("more than one new file in directory")
@@ -119,12 +162,12 @@ def select_recent_h5_file(PNCCD_DATA_PATH: Path):
         # reset variables
         NEW_FILES = set()
         SAVED_FILES = SAVED_FILES.union(RETRIEVED_FILES)
-        return file_path, datetime.fromtimestamp(time), size
+        return file_path, datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S'), size
     else:
         SAVED_FILES = RETRIEVED_FILES
         s = sorted(SAVED_FILES, key=lambda file: file[1])
         file_path, time, size = s[-1]
-        return file_path, datetime.fromtimestamp(time), size
+        return file_path, datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S'), size
 
 
 def integrated_intensity(h5_fp, threshold=0):
