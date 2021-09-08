@@ -21,7 +21,8 @@ _VARS = {'window': False,
          'scale': "-LOG-",
          'num': 0,
          'roi': None,
-         'roi_enabled': False}
+         'roi_enabled': False,
+         'square': False}
 
 plt.style.use('Solarize_Light2')
 plt.rcParams["image.cmap"] = "magma"
@@ -69,6 +70,7 @@ def drawPlot(h5_fp):
     hist_ax = _VARS['pltFig'].add_subplot(212)
 
     img = get_image_data(h5_fp, _VARS["threshold"]) if not _VARS['roi_enabled'] else _VARS["roi"]
+    img = np.square(img) if _VARS["square"] else img
     if _VARS['roi_enabled'] and _VARS["threshold"] != None:
         img = np.asarray(np.clip(img, _VARS["threshold"][0], _VARS["threshold"][1]))
         img = cv2.addWeighted(img, _VARS["contrast"], img, 0, _VARS["brightness"])
@@ -87,9 +89,10 @@ def drawPlot(h5_fp):
     hist_ax.grid(True)
     if _VARS["threshold"] != 0:
         img_inset = get_image_data(h5_fp, None) if not _VARS['roi_enabled'] else _VARS["roi"]
-        img_inset = cv2.addWeighted(img_inset, _VARS["contrast"], img, 0, _VARS["brightness"])
+        img_inset = np.square(img_inset) if _VARS["square"] else img_inset
+        #img_inset = cv2.addWeighted(img_inset, _VARS["contrast"], img, 0, _VARS["brightness"])
         ax_ins = inset_axes(hist_ax, width="40%", height="40%", loc='upper right')
-        ax_ins.hist(img_inset.ravel(), bins="auto", range=(1, np.max(img)), fc='k', ec='k')
+        ax_ins.hist(img_inset.ravel(), bins="auto", range=(1, np.max(img_inset)), fc='k', ec='k')
         ax_ins.axvline(x=_VARS["threshold"][0], linewidth=2, color="black", linestyle="-.", alpha=0.8, ymin=0)
         ax_ins.axvline(x=_VARS["threshold"][1], linewidth=2, color="black", linestyle="-.", alpha=0.8, ymin=0)
         ax_ins.grid(True)
@@ -124,7 +127,6 @@ def update(h5_fp):
 
 def single_window(h5_fp):
     # New layout with slider and padding
-
     layout = [
         [
             sg.InputText(default_text=" ", background_color="white", enable_events=True, s=(4, 4),
@@ -134,6 +136,7 @@ def single_window(h5_fp):
             sg.Button("Save", pad=((4, 0), (10, 0)))],
         [sg.HorizontalSeparator(color="white")],
         [sg.Button("Draw ROI", key="-ROI-"), sg.Checkbox("ROI visible", key="-ROI_VIS-", enable_events=True)],
+        [sg.Checkbox("Square pixels", key="-SQUARE-", enable_events=True)],
         [sg.HorizontalSeparator(color="white")],
         [sg.Text(text="Thresholds (lower / upper)", pad=((0, 0), (10, 0)), text_color='white'),
          sg.Slider(range=(0, 42000), orientation='h', size=(25, 10),
@@ -152,7 +155,7 @@ def single_window(h5_fp):
                    key='-SLIDER_CONTRAST-',
                    enable_events=True)],
         [sg.Text(text="Brightness", pad=((0, 0), (10, 0)), text_color='white'),
-         sg.Slider(range=(0, 12000), orientation='h', size=(50, 10),
+         sg.Slider(range=(-2000, 12000), orientation='h', size=(50, 10),
                    default_value=0,
                    text_color='white',
                    key='-SLIDER_BRIGHT-',
@@ -202,11 +205,18 @@ def single_window(h5_fp):
             _VARS['brightness'] = values['-SLIDER_BRIGHT-']
         elif event == "-ROI-":
             img = get_image_data(h5_fp, _VARS["threshold"])
-            roi = cv2.selectROI(img)
+            cv2.namedWindow("Draw ROI", 4)
+            roi = cv2.selectROI("Draw ROI", img, False, False)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            cv2.waitKey(30)
             roi_cropped = img[int(roi[1]):int(roi[1] + roi[3]), int(roi[0]):int(roi[0] + roi[2])]
             _VARS["roi"] = roi_cropped
         elif event == "-ROI_VIS-":
             _VARS["roi_enabled"] = True if not _VARS["roi_enabled"] else False
+            update(h5_fp)
+        elif event == "-SQUARE-":
+            _VARS["square"] = True if not _VARS["square"] else False
             update(h5_fp)
         elif event == "Save":
             save_figure(_VARS['pltFig'], h5_fp)
