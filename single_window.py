@@ -14,7 +14,7 @@ import cv2
 _VARS = {'window': False,
          'fig_agg': False,
          'pltFig': False,
-         'threshold': 0,
+         'threshold': (0, 30000),
          'contrast': 1,
          'brightness': 0,
          'index': 0,
@@ -69,11 +69,11 @@ def drawPlot(h5_fp):
     hist_ax = _VARS['pltFig'].add_subplot(212)
 
     img = get_image_data(h5_fp, _VARS["threshold"]) if not _VARS['roi_enabled'] else _VARS["roi"]
-    if _VARS['roi_enabled'] and _VARS["threshold"] != 0:
-        img = np.asarray((img > _VARS["threshold"]) * img)
-    img = cv2.addWeighted(img, _VARS["contrast"], img, 0, _VARS["brightness"])
+    if _VARS['roi_enabled'] and _VARS["threshold"] != None:
+        img = np.asarray(np.clip(img, _VARS["threshold"][0], _VARS["threshold"][1]))
+        img = cv2.addWeighted(img, _VARS["contrast"], img, 0, _VARS["brightness"])
 
-    hits = basic_hitfinding(img, _VARS["threshold"])
+    hits = basic_hitfinding(img)
     img_fig = img_ax.imshow(img, norm=cm_scale, aspect='auto')
     img_ax.set_title(
         f"DatasetID: {dataset_ID}\nTrain ID: {train_ID} Index: {_VARS['index']}\nCuml. Intensity: {intensity} Hits: {hits}")
@@ -86,11 +86,12 @@ def drawPlot(h5_fp):
     hist_ax.set_facecolor("white")
     hist_ax.grid(True)
     if _VARS["threshold"] != 0:
-        img_inset = get_image_data(h5_fp, 0) if not _VARS['roi_enabled'] else _VARS["roi"]
+        img_inset = get_image_data(h5_fp, None) if not _VARS['roi_enabled'] else _VARS["roi"]
         img_inset = cv2.addWeighted(img_inset, _VARS["contrast"], img, 0, _VARS["brightness"])
         ax_ins = inset_axes(hist_ax, width="40%", height="40%", loc='upper right')
         ax_ins.hist(img_inset.ravel(), bins="auto", range=(1, np.max(img)), fc='k', ec='k')
-        ax_ins.axvline(x=_VARS["threshold"], linewidth=2, color="black", linestyle="-.", alpha=0.8, ymin=0)
+        ax_ins.axvline(x=_VARS["threshold"][0], linewidth=2, color="black", linestyle="-.", alpha=0.8, ymin=0)
+        ax_ins.axvline(x=_VARS["threshold"][1], linewidth=2, color="black", linestyle="-.", alpha=0.8, ymin=0)
         ax_ins.grid(True)
         ax_ins.set_facecolor('white')
 
@@ -134,12 +135,16 @@ def single_window(h5_fp):
         [sg.HorizontalSeparator(color="white")],
         [sg.Button("Draw ROI", key="-ROI-"), sg.Checkbox("ROI visible", key="-ROI_VIS-", enable_events=True)],
         [sg.HorizontalSeparator(color="white")],
-        [sg.Text(text="Threshold", pad=((0, 0), (10, 0)), text_color='white'),
-         sg.Slider(range=(0, 42000), orientation='h', size=(50, 10),
+        [sg.Text(text="Thresholds (lower / upper)", pad=((0, 0), (10, 0)), text_color='white'),
+         sg.Slider(range=(0, 42000), orientation='h', size=(25, 10),
                    default_value=0,
                    text_color='white',
-                   key='-SLIDER-',
-                   enable_events=True)],
+                   key='-SLIDER_0-',
+                   enable_events=True), sg.Slider(range=(0, 42000), orientation='h', size=(25, 10),
+                                                  default_value=42000,
+                                                  text_color='white',
+                                                  key='-SLIDER_1-',
+                                                  enable_events=True)],
         [sg.Text(text="Contrast", pad=((0, 0), (10, 0)), text_color='white'),
          sg.Slider(range=(1, 42), orientation='h', size=(50, 10),
                    default_value=1,
@@ -189,7 +194,7 @@ def single_window(h5_fp):
                 _VARS["index"] = id_in
             update(h5_fp)
         elif event == '-SET_THRESHOLD-':
-            _VARS["threshold"] = int(values["-SLIDER-"])
+            _VARS["threshold"] = (int(values["-SLIDER_0-"]), int(values["-SLIDER_1-"]))
             update(h5_fp)
         elif event == '-SLIDER_CONTRAST-':
             _VARS['contrast'] = values['-SLIDER_CONTRAST-']

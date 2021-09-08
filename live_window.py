@@ -5,18 +5,18 @@ from matplotlib.colors import LogNorm, CenteredNorm, Normalize
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from utils import select_recent_h5_file, integrated_intensity, N_brightest_images
+from utils import select_recent_h5_file, integrated_intensity, N_brightest_images, load_datasetID
 from constants import PNCCD_DATA_PATH, SAVE_PATH_IMAGES
 
 plt.style.use('Solarize_Light2')
 sg.theme('black')
 
 
-def get_plots(scale: str, bar_scale: str, threshold=0):
+def get_plots(scale: str, bar_scale: str, thresholds):
     ###### INITAL DATA LOADING ########
     file_path, time, size = select_recent_h5_file(PNCCD_DATA_PATH)
-    img_ids, intensities, index = integrated_intensity(file_path, threshold)
-    max_images, max_intensity, max_index, max_train_id = N_brightest_images(file_path, 4, threshold=threshold)
+    img_ids, intensities, index = integrated_intensity(file_path, thresholds)
+    max_images, max_intensity, max_index, max_train_id = N_brightest_images(file_path, 4, threshold=thresholds)
 
     # GLobal plot parameters
     plt.rcParams['axes.grid'] = False
@@ -88,13 +88,15 @@ def get_plots(scale: str, bar_scale: str, threshold=0):
     intgr_ax.set_ylabel("Integrated Intensity")
 
     # load without threshold for histogram
-    max_images_wh_thresh, _, _, _ = N_brightest_images(file_path, 4, threshold=0)
+    max_images_wh_thresh, _, _, _ = N_brightest_images(file_path, 4, threshold=None)
     main_image_wh_thresh = max_images_wh_thresh[-1]
 
     hist_ax = intgr_fig.add_subplot(212)
     hist_ax.set_title("Intensity Histogram Of Main Image", fontsize=9)
     hist_ax.hist(main_image_wh_thresh.ravel(), bins="auto", range=(1, np.max(main_image_wh_thresh)), fc='k', ec='k')
-    hist_ax.axvline(x=threshold, linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
+    hist_ax.axvline(x=thresholds[0], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
+    hist_ax.axvline(x=thresholds[1], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
+
     hist_ax.set_facecolor("white")
     hist_ax.grid(True)
 
@@ -123,7 +125,7 @@ def live_window():
     bar_events = ["-BAR_LOG-", "-BAR_LIN-"]
     scale = "-LOG-"
     bar_scale = "-BAR_LIN-"
-    threshold = 0
+    thresholds = (0, 30000)
 
     ####### LAYOUT ##########
     left_col = [[sg.Canvas(key="-MAIN_PLOT-")]]
@@ -139,15 +141,21 @@ def live_window():
          sg.Checkbox("linear", key="-LIN-", enable_events=True),
          sg.Checkbox("auto", key="-AUTO-", enable_events=True)],
         [sg.HorizontalSeparator(color="white")],
-        [sg.Text(f"{round(threshold, 0)}", key="-THRESHOLD_TXT-"),sg.Button("Set", key="-THRESHOLD-")],
+        [sg.Text(f"Value: {round(thresholds[0], 0)}, {round(thresholds[1], 0)}", key="-THRESHOLD_TXT-"),sg.Button("Set", key="-THRESHOLD-")],
         [sg.Slider(range=(0, 30000), orientation='h', size=(34, 20),
                   default_value=100,
                   background_color='#FDF6E3',
                   text_color='Black',
                   key='-SLIDER-',
                   enable_events=True)],
+        [sg.Slider(range=(0, 30000), orientation='h', size=(34, 20),
+                   default_value=100,
+                   background_color='#FDF6E3',
+                   text_color='Black',
+                   key='-SLIDER_THRESH_UPPER-',
+                   enable_events=True)],
         [sg.HorizontalSeparator(color="white")],
-        [sg.Button("Refresh", key="-REFRESH-")]
+        [sg.Button("Refresh", key="-REFRESH-"), sg.Button("Save", key="-SAVE-")]
 
     ]
     bottom_row = [[sg.Canvas(key="-SUB_ONE-"), sg.Canvas(key="-SUB_TWO-"), sg.Canvas(key="-SUB_THREE-")]]
@@ -168,9 +176,10 @@ def live_window():
     window["-BAR_LIN-"].update(True)
 
     ####### DRAW FIGURES ##########
+
     window_keys = [window["-MAIN_PLOT-"], window["-SUB_ONE-"], window["-SUB_TWO-"], window["-SUB_THREE-"],
                    window["-INTENSITY_PLOT-"]]
-    figures = get_plots(scale, bar_scale, 0)
+    figures = get_plots(scale, bar_scale, thresholds)
     canvas = [draw_figure(window_keys[i].TKCanvas, figures[i]) for i in range(0, len(figures))]
 
     while True:
@@ -192,19 +201,28 @@ def live_window():
             break
         if event == "-REFRESH-":
             destroy(canvas)
-            threshold = 0
-            window["-THRESHOLD_TXT-"].update(threshold)
+            thresholds = [0, 30000]
+            window["-THRESHOLD_TXT-"].update(f"Value: {round(thresholds[0], 0)}, {round(thresholds[1], 0)}")
             PLOTS_DRAWN = False
-        if event == "-SLIDER-":
-            threshold = values["-SLIDER-"]
-            window["-THRESHOLD_TXT-"].update(threshold)
+        if event == "-SLIDER-" or event == "-SLIDER_THRESH_UPPER-":
+            thresholds = (values["-SLIDER-"], values['-SLIDER_THRESH_UPPER-'])
+            window["-THRESHOLD_TXT-"].update(f"Value: {round(thresholds[0], 0)}, {round(thresholds[1], 0)}")
         if event == "-THRESHOLD-":
-            threshold = values["-SLIDER-"]
-            window["-THRESHOLD_TXT-"].update(threshold)
+            thresholds = (values["-SLIDER-"], values['-SLIDER_THRESH_UPPER-'])
             PLOTS_DRAWN = False
+        if event == "-SAVE-":
+            dataset_ID = load_datasetID(file_path)
+            save_dir = SAVE_PATH_IMAGES / f"live_view_{dataset_ID}"
+            if not save_dir.is_dir():
+                save_dir.mkdir()
+            num = 0
+            for _ in save_dir.iterdir():
+                num += 1
+            [c.print_png(save_dir / str(f"plot_{i}.png")) for c, i in zip(canvas,range(num, num+len(canvas)))]
+
         if not PLOTS_DRAWN:
             destroy(canvas)
-            figures = get_plots(scale, bar_scale, threshold)
+            figures = get_plots(scale, bar_scale, thresholds)
             canvas = [draw_figure(window_keys[i].TKCanvas, figures[i]) for i in range(0, len(figures))]
             PLOTS_DRAWN = True
 

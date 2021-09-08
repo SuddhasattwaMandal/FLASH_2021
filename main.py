@@ -1,11 +1,9 @@
 import PySimpleGUI as sg
-from functools import reduce
 from pathlib import Path
 import numpy as np
 
 from utils import select_h5_files
-import pandas as pd
-from utils import data_from_key, TRAINID_KEY, IMAGE_KEY, df_from_h5
+from utils import data_from_key, TRAINID_KEY, IMAGE_KEY
 from constants import create_save_folders, DATA_PATH
 from live_window import live_window
 from table_window import table
@@ -105,14 +103,10 @@ while True:
 
     ########## SINGLE VIEW ##########
     if event == "-SINGLE_VIEW-" and SELECTED_FILE:
-        single_win = single_window(str(SELECTED_FILE).rsplit("|")[0])
+        single_win = single_window(str(SELECTED_FILE).rsplit(" |")[0])
 
     ########## STATISTICS ##########
     if event == "-TABLE-":
-        fnames, parent, times = select_h5_files(DATA_PATH)
-        dframes = [df_from_h5(Path(parent) / path) for path in fnames]
-        df_final = reduce(lambda left, right: pd.concat([left, right]), dframes)
-        # df_final = df_final.drop_duplicates()
-        table_win = table(df_final)
+        table_win = table()
 
 window.close()

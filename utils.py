@@ -4,7 +4,7 @@ from pathlib import Path
 import h5py
 import json
 import pandas as pd
-from logging import warning
+from logging import warning, info
 from datetime import datetime
 
 # variables which will be used often
@@ -30,15 +30,15 @@ THRESHOLD = 12000
 ######### H5 to Dataframe #########
 
 
-def df_from_h5(h5_fp, threshold=0):
-    columns = ["Train ID", "Intgr. Intensity", f"Hits (t: {threshold}", "Mean Px Value", "Dataset ID", "Timestamp",  "Temperature"]
+def df_from_h5(h5_fp, threshold):
+    columns = ["Train ID", "Cuml. Intensity", f"Hits", "Mean Value", "Dataset ID", "Timestamp",  "Temperature"]
     data = list([])
 
-    images = load_pnccd_image_data(h5_fp)
+    images = load_pnccd_image_data(h5_fp, (threshold[0], threshold[1]))
     data.append(load_trainID(h5_fp))
     _, intensities, _ = integrated_intensity(h5_fp, 0)
     data.append(intensities)
-    data.append([basic_hitfinding(img, threshold) for img in images])
+    data.append([basic_hitfinding(img) for img in images])
     data.append([np.mean(img.flatten()) for img in images])
     id = load_datasetID(h5_fp)
     data.append([str(id) for _ in range(0, len(images))])
@@ -95,17 +95,18 @@ def data_from_key(h5_fp: Path, key: str) -> np.array:
             return np.asarray(data[PNCCD_KEY][key])
 
 
-def load_pnccd_image_data(h5_fp: Path, threshold = 0):
+def load_pnccd_image_data(h5_fp: Path, threshold):
     """
     loads newest .h5 file in directory containing PNCCD_KEY and IMAGE_KEY-
     return 2 dimensional numpy array representing the image
     if more than one image was taken, mean of image is returned.
     """
-    if threshold != 0:
-        images = data_from_key(h5_fp, IMAGE_KEY)
-        return [np.asarray((array > threshold) * array) for array in images]
+    gain = int(str(load_datasetID(h5_fp)).rsplit("_G")[-1][0:3])
+    if not threshold:
+        return data_from_key(h5_fp, IMAGE_KEY) * gain
     else:
-        return data_from_key(h5_fp, IMAGE_KEY)
+        images = data_from_key(h5_fp, IMAGE_KEY) * gain
+        return [np.clip(array, threshold[0], threshold[1]) for array in images]
 
 
 def load_temperature(h5_fp):
@@ -171,13 +172,17 @@ def select_recent_h5_file(PNCCD_DATA_PATH: Path):
 
 
 def integrated_intensity(h5_fp, threshold=0):
+    # calculate summed up image intensity
     img_ids = [ID for ID in load_trainID(h5_fp)]
     index = np.arange(0, len(img_ids), 1)
-    intgr_intensities = [sum_array(image, threshold) for image in load_pnccd_image_data(h5_fp)]
+    intgr_intensities = [sum_array(image, threshold) for image in load_pnccd_image_data(h5_fp, threshold)]
     return img_ids, intgr_intensities, index
 
 
+
 def N_brightest_images(h5_fp, N: int, threshold: int):
+    if threshold is None:
+        threshold = 0
     img_ids, intensities, index = integrated_intensity(h5_fp, threshold=threshold)
     unsorted = [(intensity, i, id) for intensity, i, id in zip(intensities, index, img_ids)]
     s = sorted(unsorted, key=lambda item: item[0])
@@ -189,10 +194,13 @@ def N_brightest_images(h5_fp, N: int, threshold: int):
 
 
 ######## ARRAY CALCULATIONS ###########
-def sum_array(image: np.ndarray, threshold: int):
-    return np.sum(np.array(image) >= threshold)
+def sum_array(image: np.ndarray, threshold):
+    if isinstance(threshold, int):
+        return np.sum(np.array(image) >= threshold)
+    elif len(threshold) == 2:
+        return np.sum(np.clip(image, threshold[0], threshold[1]))
 
 
-def basic_hitfinding(image: np.ndarray, threshold: int = 15000):
-    hit = np.array(image > threshold, dtype='int')
-    return int(np.count_nonzero(hit))
+def basic_hitfinding(image: np.ndarray):
+    hit_array = np.array(image, dtype='int')
+    return int(np.count_nonzero(hit_array))
