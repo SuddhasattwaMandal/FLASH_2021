@@ -4,20 +4,20 @@ from utils import save_df_as_json, df_from_path, select_h5_files, df_from_h5
 from functools import reduce
 from pathlib import Path
 import pandas as pd
-from constants import SAVE_PATH_TABLE, DATA_PATH
+from constants import Constants
 
 _VARS = {"threshold": (0, 100000)}
 
 
-def get_table_data_from_dir():
-    fnames, parent, times = select_h5_files(DATA_PATH)
+def get_table_data_from_dir(const: Constants):
+    fnames, parent, times = select_h5_files(const.DATA_PATH)
     dframes = [df_from_h5(Path(parent) / path, _VARS["threshold"]) for path in fnames]
     df = reduce(lambda left, right: pd.concat([left, right]), dframes)
-    return df
+    return df, fnames
 
 
-def table():
-    df = get_table_data_from_dir()
+def table(const: Constants):
+    df, fnames = get_table_data_from_dir(const)
     data = df.values.tolist()
     header_list = df.columns.values.tolist()
     layout = [
@@ -34,6 +34,7 @@ def table():
                     key='-SLIDER_1-',
                     enable_events=True)],
          sg.Button("Apply", pad=((4, 0), (10, 0)), key="-SET_THRESHOLD-")],
+        [sg.Text(f"#images: {df.shape[0]}"), sg.Text(f"#files: {len(fnames)}")],
         [sg.Table(values=data,
                   headings=header_list,
                   display_row_numbers=True,
@@ -47,7 +48,7 @@ def table():
         event, values = window.read()
         print(event, values)
         if event == "-SAVE_TAB-":
-            save_df_as_json(df, SAVE_PATH_TABLE)
+            save_df_as_json(df, const.SAVE_PATH_TABLE)
 
         if event == "-OPEN-":
             fp = SAVE_PATH_TABLE

@@ -4,17 +4,18 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, CenteredNorm, Normalize
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from logging import info, warning
 
 from utils import select_recent_h5_file, integrated_intensity, N_brightest_images, load_datasetID
-from constants import PNCCD_DATA_PATH, SAVE_PATH_IMAGES
+from constants import Constants
 
 plt.style.use('Solarize_Light2')
 sg.theme('black')
 
 
-def get_plots(scale: str, bar_scale: str, thresholds):
+def get_plots(scale: str, bar_scale: str, thresholds, const: Constants):
     ###### INITAL DATA LOADING ########
-    file_path, time, size = select_recent_h5_file(PNCCD_DATA_PATH)
+    file_path, time, size = select_recent_h5_file(const.DATA_PATH)
     img_ids, intensities, index = integrated_intensity(file_path, thresholds)
     max_images, max_intensity, max_index, max_train_id = N_brightest_images(file_path, 4, threshold=thresholds)
 
@@ -86,6 +87,7 @@ def get_plots(scale: str, bar_scale: str, thresholds):
     intgr_ax.bar(index, intensities, width=0.3, align="center", alpha=0.9, log=bar_log)
     #intgr_ax.set_xlabel("Index")
     intgr_ax.set_ylabel("Integrated Intensity")
+    intgr_ax.set_xlabel("Image index")
 
     # load without threshold for histogram
     max_images_wh_thresh, _, _, _ = N_brightest_images(file_path, 4, threshold=None)
@@ -96,14 +98,17 @@ def get_plots(scale: str, bar_scale: str, thresholds):
     hist_ax.hist(main_image_wh_thresh.ravel(), bins="auto", range=(1, np.max(main_image_wh_thresh)), fc='k', ec='k')
     hist_ax.axvline(x=thresholds[0], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
     hist_ax.axvline(x=thresholds[1], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
-
     hist_ax.set_facecolor("white")
     hist_ax.grid(True)
+    hist_ax.set_ylabel("counts")
+    hist_ax.set_xlabel("px. value")
+
 
     return main_fig, sub_one_fig, sub_two_fig, sub_three_fig, intgr_fig
 
 
 def draw_figure(canvas, figure):
+    info("drawing plots")
     figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
     figure_canvas_agg.draw()
     figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
@@ -111,6 +116,7 @@ def draw_figure(canvas, figure):
 
 
 def destroy(canvas_list):
+    info("destroying canvas plots.")
     [c.get_tk_widget().destroy() for c in canvas_list]
     plt.close("all")
     return
@@ -119,7 +125,7 @@ def destroy(canvas_list):
 PLOTS_DRAWN = False
 
 
-def live_window():
+def live_window(const: Constants):
     global PLOTS_DRAWN
     scale_events = ["-LOG-", "-LIN-", "-AUTO-"]
     bar_events = ["-BAR_LOG-", "-BAR_LIN-"]
@@ -141,21 +147,22 @@ def live_window():
          sg.Checkbox("linear", key="-LIN-", enable_events=True),
          sg.Checkbox("auto", key="-AUTO-", enable_events=True)],
         [sg.HorizontalSeparator(color="white")],
-        [sg.Text(f"Value: {round(thresholds[0], 0)}, {round(thresholds[1], 0)}", key="-THRESHOLD_TXT-"),sg.Button("Set", key="-THRESHOLD-")],
+        [sg.Text(f"Threshold (lower / upper): {round(thresholds[0], 0)}, {round(thresholds[1], 0)}", key="-THRESHOLD_TXT-")],
+        [sg.Button("Set", key="-THRESHOLD-")],
         [sg.Slider(range=(0, 30000), orientation='h', size=(34, 20),
                   default_value=66,
                   background_color='#FDF6E3',
                   text_color='Black',
                   key='-SLIDER-',
-                  enable_events=True)],
+                  enable_events=False)],
         [sg.Slider(range=(0, 30000), orientation='h', size=(34, 20),
                    default_value=6666,
                    background_color='#FDF6E3',
                    text_color='Black',
                    key='-SLIDER_THRESH_UPPER-',
-                   enable_events=True)],
+                   enable_events=False)],
         [sg.HorizontalSeparator(color="white")],
-        [sg.Button("Refresh", key="-REFRESH-"), sg.Button("Save", key="-SAVE-")]
+        [sg.Button("Reset", key="-REFRESH-"), sg.Button("Save", key="-SAVE-")]
 
     ]
     bottom_row = [[sg.Canvas(key="-SUB_ONE-"), sg.Canvas(key="-SUB_TWO-"), sg.Canvas(key="-SUB_THREE-")]]
@@ -164,13 +171,13 @@ def live_window():
               [sg.Column(left_col), sg.Column(middle_col)],
               [sg.Column(bottom_row), sg.Column(right_col)]]
 
-    window = sg.Window('LIVE VIEW', layout, finalize=True, size=(1200, 1000), resizable=True, modal=True)
+    window = sg.Window('LIVE VIEW', layout, finalize=True, size=(1300, 1000), resizable=True, modal=True)
 
     # Global plot parameters
     plt.rcParams['axes.grid'] = False
     plt.rcParams["image.cmap"] = "magma"
 
-    file_path, time, size = select_recent_h5_file(PNCCD_DATA_PATH)
+    file_path, time, size = select_recent_h5_file(const.DATA_PATH)
     window["-SELECTED_FILE-"].update(f"{file_path}  {time}")
     window["-LOG-"].update(True)
     window["-BAR_LIN-"].update(True)
@@ -179,13 +186,13 @@ def live_window():
 
     window_keys = [window["-MAIN_PLOT-"], window["-SUB_ONE-"], window["-SUB_TWO-"], window["-SUB_THREE-"],
                    window["-INTENSITY_PLOT-"]]
-    figures = get_plots(scale, bar_scale, thresholds)
+    figures = get_plots(scale, bar_scale, thresholds, const)
     canvas = [draw_figure(window_keys[i].TKCanvas, figures[i]) for i in range(0, len(figures))]
 
     while True:
         event, values = window.read()
-        print(event, values)
-        file_path, time, size = select_recent_h5_file(PNCCD_DATA_PATH)
+        # print(event, values)
+        file_path, time, size = select_recent_h5_file(const.DATA_PATH)
         window["-SELECTED_FILE-"].update(f"{file_path}  {time}")
         if event in scale_events:
             [window[scale].update(False) if event != scale else window[scale].update(True) for scale in scale_events]
@@ -212,7 +219,7 @@ def live_window():
             PLOTS_DRAWN = False
         if event == "-SAVE-":
             dataset_ID = load_datasetID(file_path)
-            save_dir = SAVE_PATH_IMAGES / f"live_view_{dataset_ID}"
+            save_dir = const.SAVE_PATH_IMAGES / f"live_view_{dataset_ID}"
             if not save_dir.is_dir():
                 save_dir.mkdir()
             num = 0
@@ -222,7 +229,7 @@ def live_window():
 
         if not PLOTS_DRAWN:
             destroy(canvas)
-            figures = get_plots(scale, bar_scale, thresholds)
+            figures = get_plots(scale, bar_scale, thresholds, const)
             canvas = [draw_figure(window_keys[i].TKCanvas, figures[i]) for i in range(0, len(figures))]
             PLOTS_DRAWN = True
 
@@ -230,4 +237,4 @@ def live_window():
 
 
 if __name__ == "__main__":
-    live_window()
+    live_window(Constants)

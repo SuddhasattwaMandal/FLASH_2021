@@ -9,7 +9,6 @@ from datetime import datetime
 
 # variables which will be used often
 PNCCD_DATA_PATH = Path("./data/pnCCD sample files/")
-
 PNCCD_KEY = "PNCCD"
 IMAGE_KEY = "image"
 
@@ -51,6 +50,7 @@ def df_from_h5(h5_fp, threshold):
 
 def save_df_as_json(df: pd.DataFrame, save_path):
     if save_path:
+        info(f"saving table data in {save_path}")
         f = save_path / f"table_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.json"
         result = df.to_json(f, orient="table")
         return True
@@ -76,7 +76,7 @@ def select_h5_files(PNCCD_DATA_PATH):
         PNCCD_DATA_PATH = Path(PNCCD_DATA_PATH)
     for file in PNCCD_DATA_PATH.rglob("*"):
         # read new files containing the KEYWORDS and add to set
-        if H5_TYPE and PNCCD_KEY.lower() in str(file.name):
+        if H5_TYPE in str(file.name):
             if file.is_file():
                 stat = file.stat()
                 time = stat.st_ctime
@@ -101,6 +101,7 @@ def load_pnccd_image_data(h5_fp: Path, threshold):
     return 2 dimensional numpy array representing the image
     if more than one image was taken, mean of image is returned.
     """
+    info(f"loading pnncd image data from {h5_fp}")
     gain = int(str(load_datasetID(h5_fp)).rsplit("_G")[-1][0:3])
     if not threshold:
         return data_from_key(h5_fp, IMAGE_KEY) * gain
@@ -136,7 +137,7 @@ def select_recent_h5_file(PNCCD_DATA_PATH: Path):
     nameSet = set()
     for file in PNCCD_DATA_PATH.iterdir():
         # read new files containing the KEYWORDS and add to set
-        if H5_TYPE and PNCCD_KEY.lower() in str(file):
+        if H5_TYPE in str(file):
             if file.is_file():
                 nameSet.add(file)
 

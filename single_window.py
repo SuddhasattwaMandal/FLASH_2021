@@ -1,7 +1,7 @@
 import PySimpleGUI as sg
 import numpy as np
 from utils import load_pnccd_image_data, load_trainID, load_datasetID, integrated_intensity, basic_hitfinding
-from constants import SAVE_PATH_IMAGES
+from constants import Constants as C
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -46,7 +46,7 @@ def save_figure(figure, h5_fp):
     dataset_ID = load_datasetID(h5_fp)
     name = f"single_ROI_{dataset_ID}_{train_ID}_{_VARS['index']}.png" if _VARS[
         "roi_enabled"] else f"single_{dataset_ID}_{train_ID}_{_VARS['index']}.png"
-    figure.savefig(SAVE_PATH_IMAGES / name)
+    figure.savefig(C.SAVE_PATH_IMAGES / name)
 
 
 def get_image_data(h5_fp, threshold=0):
