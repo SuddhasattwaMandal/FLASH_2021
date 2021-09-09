@@ -27,10 +27,10 @@ def get_plots(scale: str, bar_scale: str, thresholds, const: Constants):
         if scale == "-AUTO-" else Normalize() if scale == "-LIN-" else None
 
     ####### DRAW FIGURES ##########
-    main_fig = plt.figure(0, figsize=(6, 6))
+    main_fig = plt.figure(0, figsize=(5, 5))
     main_ax = main_fig.add_subplot(111)
     main_img = main_ax.imshow(max_images[-1], aspect="auto", norm=cm_scale)
-    main_ax.set_title(f"Train ID: {max_train_id[-1]} Index: {max_index[-1]}\nIntgr. Intensity: {max_intensity[-1]}")
+    main_ax.set_title(f"Train ID: {max_train_id[-1]} Index: {max_index[-1]}\nIntgr. Intensity: {max_intensity[-1]}", fontsize=12)
     divider = make_axes_locatable(main_ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     main_fig.colorbar(main_img, cax=cax, orientation="vertical")
@@ -78,30 +78,34 @@ def get_plots(scale: str, bar_scale: str, thresholds, const: Constants):
     sub_three_ax.set(xticklabels=[]); sub_three_ax.set(yticklabels=[])
 
 
-    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-    intgr_fig = plt.figure(4, figsize=(6, 6))
+    #plt.tight_layout(pad=0.9, w_pad=0.9, h_pad=1.5)
+    intgr_fig = plt.figure(4, figsize=(6, 5))
     intgr_ax = intgr_fig.add_subplot(211)
-    intgr_ax.set_title("Integrated Intensities", fontsize=9)
+    #intgr_ax.set_title("Integrated Intensities", fontsize=9)
     intgr_ax.set_facecolor("white")
     bar_log = True if bar_scale == "-BAR_LOG-" else False
+    plt.tick_params(axis="y", which="major", labelleft=False, labelright=True)
     intgr_ax.bar(index, intensities, width=0.3, align="center", alpha=0.9, log=bar_log)
     #intgr_ax.set_xlabel("Index")
-    intgr_ax.set_ylabel("Integrated Intensity")
-    intgr_ax.set_xlabel("Image index")
+    intgr_ax.yaxis.tick_right()
+    intgr_ax.set_ylabel("Integrated Intensity", fontsize=9)
+    intgr_ax.set_xlabel("Image index", fontsize=9)
 
     # load without threshold for histogram
     max_images_wh_thresh, _, _, _ = N_brightest_images(file_path, 4, threshold=None)
     main_image_wh_thresh = max_images_wh_thresh[-1]
 
     hist_ax = intgr_fig.add_subplot(212)
-    hist_ax.set_title("Intensity Histogram Of Main Image", fontsize=9)
+    #hist_ax.set_title("Intensity Histogram Of Main Image", fontsize=9)
+    plt.tick_params(axis="y", which="major", labelleft=False, labelright=True)
+    hist_ax.yaxis.tick_right()
     hist_ax.hist(main_image_wh_thresh.ravel(), bins="auto", range=(1, np.max(main_image_wh_thresh)), fc='k', ec='k')
     hist_ax.axvline(x=thresholds[0], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
     hist_ax.axvline(x=thresholds[1], linewidth=1.3, color="black", linestyle="-.", alpha=0.8, ymin=0)
     hist_ax.set_facecolor("white")
     hist_ax.grid(True)
-    hist_ax.set_ylabel("counts")
-    hist_ax.set_xlabel("px. value")
+    hist_ax.set_ylabel("counts (main image)", fontsize=9)
+    hist_ax.set_xlabel("px. value", fontsize=9)
 
 
     return main_fig, sub_one_fig, sub_two_fig, sub_three_fig, intgr_fig
@@ -168,10 +172,10 @@ def live_window(const: Constants):
     bottom_row = [[sg.Canvas(key="-SUB_ONE-"), sg.Canvas(key="-SUB_TWO-"), sg.Canvas(key="-SUB_THREE-")]]
 
     layout = [[sg.T("Recent File: "), sg.Text('NONE', key="-SELECTED_FILE-")],
-              [sg.Column(left_col), sg.Column(middle_col)],
-              [sg.Column(bottom_row), sg.Column(right_col)]]
+              [sg.Column(left_col), sg.Column(middle_col), sg.Column(right_col)],
+              [sg.Column(bottom_row)]]
 
-    window = sg.Window('LIVE VIEW', layout, finalize=True, size=(1300, 1000), resizable=True, modal=True)
+    window = sg.Window('LIVE VIEW', layout, finalize=True, size=(1490, 800), resizable=True, modal=True)
 
     # Global plot parameters
     plt.rcParams['axes.grid'] = False

@@ -1,7 +1,7 @@
 import PySimpleGUI as sg
 import numpy as np
 from utils import load_pnccd_image_data, load_trainID, load_datasetID, integrated_intensity, basic_hitfinding
-from constants import Constants as C
+from constants import Constants
 import warnings
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -41,12 +41,12 @@ def draw_figure(canvas, figure):
     return figure_canvas_agg
 
 
-def save_figure(figure, h5_fp):
+def save_figure(figure, h5_fp, const):
     train_ID = load_trainID(h5_fp)[_VARS['index']]
     dataset_ID = load_datasetID(h5_fp)
     name = f"single_ROI_{dataset_ID}_{train_ID}_{_VARS['index']}.png" if _VARS[
         "roi_enabled"] else f"single_{dataset_ID}_{train_ID}_{_VARS['index']}.png"
-    figure.savefig(C.SAVE_PATH_IMAGES / name)
+    figure.savefig(const.SAVE_PATH_IMAGES / name)
 
 
 def get_image_data(h5_fp, threshold=0):
@@ -78,7 +78,7 @@ def drawPlot(h5_fp):
     hits = basic_hitfinding(img)
     img_fig = img_ax.imshow(img, norm=cm_scale, aspect='auto')
     img_ax.set_title(
-        f"DatasetID: {dataset_ID}\nTrain ID: {train_ID} Index: {_VARS['index']}\nCuml. Intensity: {intensity} Hits: {hits}")
+        f"DatasetID: {dataset_ID}\nTrain ID: {train_ID} Index: {_VARS['index']}\nCuml. Intensity: {intensity} Hits: {hits}", fontsize=12)
     img_ax.set_facecolor("white")
     divider = make_axes_locatable(img_ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -125,7 +125,7 @@ def update(h5_fp):
     drawPlot(h5_fp)
 
 
-def single_window(h5_fp):
+def single_window(h5_fp, const: Constants):
     # New layout with slider and padding
     layout = [
         [
@@ -219,6 +219,6 @@ def single_window(h5_fp):
             _VARS["square"] = True if not _VARS["square"] else False
             update(h5_fp)
         elif event == "Save":
-            save_figure(_VARS['pltFig'], h5_fp)
+            save_figure(_VARS['pltFig'], h5_fp, const)
 
     _VARS['window'].close()

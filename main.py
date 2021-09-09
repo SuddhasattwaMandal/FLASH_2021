@@ -112,7 +112,7 @@ while True:
     ########## SINGLE VIEW ##########
     if event == "-SINGLE_VIEW-" and SELECTED_FILE:
         logger.info(f"opening single view window for {SELECTED_FILE}")
-        single_win = single_window(str(SELECTED_FILE).rsplit(" |")[0])
+        single_win = single_window(str(SELECTED_FILE).rsplit(" |")[0], const=C)
 
     ########## STATISTICS ##########
     if event == "-TABLE-":
