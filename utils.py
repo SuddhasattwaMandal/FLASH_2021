@@ -83,8 +83,11 @@ def select_h5_files(PNCCD_DATA_PATH):
                 nameSet.append(str(file.name))
                 times.append(datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S'))
                 parent = str(file.parent)
-    return nameSet, parent, times
-
+    if nameSet:
+        return nameSet, parent, times
+    else:
+        warning("no pnccd image files in folder")
+        return None, None, None
 
 def data_from_key(h5_fp: Path, key: str) -> np.array:
     """ read pnccd .h5 file and return data to given key as numpy array"""

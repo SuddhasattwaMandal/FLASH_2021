@@ -89,10 +89,15 @@ while True:
     ########## FILE SELECTION ##########
     if event == "-FOLDER-":
         folder = values["-FOLDER-"]
+        C.change_data_path(new_path=folder)
         fnames, parent, times = select_h5_files(C.DATA_PATH)
-        window["-FILE_LIST-"].update([f"{n} | {t}" for n, t in zip(fnames, times)])
-        window["-DATA_DIR-"].update(parent)
-        C.change_data_path(new_path=parent)
+        if fnames and parent and times:
+            window["-FILE_LIST-"].update([f"{n} | {t}" for n, t in zip(fnames, times)])
+            window["-DATA_DIR-"].update(parent)
+        else:
+            window["-FILE_LIST-"].update("**ERROR: NO DATA**")
+            window["-DATA_DIR-"].update("**INVALID DATA PATH**")
+
     if event == "-REFRESH-":
         fnames, parent, times = select_h5_files(C.DATA_PATH)
         window["-FILE_LIST-"].update([f"{n} | {t}" for n, t in zip(fnames, times)])
